@@ -167,6 +167,56 @@ Supported tags:
 - `validate:"required"` - Also marks as required (validator library)
 - `binding:"required"` - Also marks as required (Gin)
 
+## Framework Adapters
+
+### Chi
+```go
+import (
+    openswag "github.com/andrianprasetya/open-swag-go"
+    chiadapter "github.com/andrianprasetya/open-swag-go/adapters/chi"
+    "github.com/go-chi/chi/v5"
+)
+
+r := chi.NewRouter()
+chiadapter.Mount(r, docs, "/docs")
+```
+
+### Gin
+```go
+import (
+    openswag "github.com/andrianprasetya/open-swag-go"
+    ginadapter "github.com/andrianprasetya/open-swag-go/adapters/gin"
+    "github.com/gin-gonic/gin"
+)
+
+r := gin.Default()
+ginadapter.Mount(r, docs, "/docs")
+```
+
+### Echo
+```go
+import (
+    openswag "github.com/andrianprasetya/open-swag-go"
+    echoadapter "github.com/andrianprasetya/open-swag-go/adapters/echo"
+    "github.com/labstack/echo/v4"
+)
+
+e := echo.New()
+echoadapter.Mount(e, docs, "/docs")
+```
+
+### Fiber
+```go
+import (
+    openswag "github.com/andrianprasetya/open-swag-go"
+    fiberadapter "github.com/andrianprasetya/open-swag-go/adapters/fiber"
+    "github.com/gofiber/fiber/v2"
+)
+
+app := fiber.New()
+fiberadapter.Mount(app, docs, "/docs")
+```
+
 ## License
 
 MIT License

@@ -70,3 +70,13 @@ func (d *Docs) MountWithRouter(mountFn func(pattern string, handler http.Handler
 	mountFn(basePath, d.Handler())
 	mountFn(basePath+"/openapi.json", d.SpecHandler())
 }
+
+// HandlerHTTP returns the documentation UI as http.Handler
+func (d *Docs) HandlerHTTP() http.Handler {
+	return http.HandlerFunc(d.Handler())
+}
+
+// SpecHandlerHTTP returns the OpenAPI spec as http.Handler
+func (d *Docs) SpecHandlerHTTP() http.Handler {
+	return http.HandlerFunc(d.SpecHandler())
+}
