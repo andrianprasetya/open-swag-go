@@ -2,22 +2,61 @@ package openswag
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/andrianprasetya/open-swag-go/pkg/schema"
+	"github.com/andrianprasetya/open-swag-go/pkg/spec"
 )
 
 // Docs is the main documentation instance
 type Docs struct {
 	config    Config
 	endpoints []Endpoint
-	spec      *Spec
+	openapi   *spec.OpenAPI
 	mu        sync.RWMutex
+}
+
+// Endpoint represents an API endpoint definition
+type Endpoint struct {
+	Method      string
+	Path        string
+	Summary     string
+	Description string
+	Tags        []string
+	Parameters  []Parameter
+	RequestBody *RequestBody
+	Responses   map[int]Response
+	Security    []string
+	Deprecated  bool
+}
+
+// Parameter represents an API parameter
+type Parameter struct {
+	Name        string
+	In          string // "path", "query", "header", "cookie"
+	Description string
+	Required    bool
+	Schema      *spec.Schema
+	Example     interface{}
+}
+
+// RequestBody represents a request body
+type RequestBody struct {
+	Description string
+	Required    bool
+	Schema      interface{}
+	ContentType string
+}
+
+// Response represents an API response
+type Response struct {
+	Description string
+	Schema      interface{}
 }
 
 // New creates a new documentation instance
 func New(config Config) *Docs {
-	// Apply defaults
 	if config.UI.Theme == "" {
 		config.UI.Theme = "purple"
 	}
@@ -36,7 +75,7 @@ func (d *Docs) Add(endpoint Endpoint) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.endpoints = append(d.endpoints, endpoint)
-	d.spec = nil // Invalidate cache
+	d.openapi = nil
 }
 
 // AddAll registers multiple endpoints
@@ -47,93 +86,94 @@ func (d *Docs) AddAll(endpoints ...Endpoint) {
 }
 
 // BuildSpec generates the OpenAPI spec
-func (d *Docs) BuildSpec() *Spec {
+func (d *Docs) BuildSpec() *spec.OpenAPI {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if d.spec != nil {
-		return d.spec
+	if d.openapi != nil {
+		return d.openapi
 	}
 
-	spec := &Spec{
-		OpenAPI: "3.1.0",
-		Info:    d.config.Info,
-		Servers: d.config.Servers,
-		Tags:    d.config.Tags,
-		Paths:   make(map[string]PathItem),
-		Components: Components{
-			Schemas:         make(map[string]*Schema),
-			SecuritySchemes: make(map[string]map[string]interface{}),
-		},
+	info := spec.NewInfo(d.config.Info.Title, d.config.Info.Version).
+		WithDescription(d.config.Info.Description)
+
+	if d.config.Info.Contact != nil {
+		info = info.WithContact(
+			d.config.Info.Contact.Name,
+			d.config.Info.Contact.URL,
+			d.config.Info.Contact.Email,
+		)
 	}
 
-	// Add security schemes
-	for _, scheme := range d.config.Auth.Schemes {
-		spec.Components.SecuritySchemes[scheme.Name] = scheme.ToOpenAPI()
+	if d.config.Info.License != nil {
+		info = info.WithLicense(d.config.Info.License.Name, d.config.Info.License.URL)
+	}
+
+	openapi := spec.NewOpenAPI(info)
+
+	// Add servers
+	for _, srv := range d.config.Servers {
+		openapi.AddServer(spec.NewServer(srv.URL).WithDescription(srv.Description))
+	}
+
+	// Add tags
+	for _, tag := range d.config.Tags {
+		openapi.AddTag(spec.Tag{Name: tag.Name, Description: tag.Description})
 	}
 
 	// Build paths from endpoints
 	for _, ep := range d.endpoints {
-		d.addEndpointToSpec(spec, ep)
+		d.addEndpointToSpec(openapi, ep)
 	}
 
-	d.spec = spec
-	return spec
+	d.openapi = openapi
+	return openapi
 }
 
-func (d *Docs) addEndpointToSpec(spec *Spec, ep Endpoint) {
-	pathItem, exists := spec.Paths[ep.Path]
-	if !exists {
-		pathItem = PathItem{}
+func (d *Docs) addEndpointToSpec(openapi *spec.OpenAPI, ep Endpoint) {
+	pathItem := openapi.Paths[ep.Path]
+	if pathItem == nil {
+		pathItem = spec.NewPathItem()
 	}
 
-	operation := d.buildOperation(spec, ep)
+	operation := d.buildOperation(ep)
 
 	method := strings.ToUpper(ep.Method)
 	switch method {
 	case "GET":
-		pathItem.Get = operation
+		pathItem.SetGet(operation)
 	case "POST":
-		pathItem.Post = operation
+		pathItem.SetPost(operation)
 	case "PUT":
-		pathItem.Put = operation
+		pathItem.SetPut(operation)
 	case "PATCH":
-		pathItem.Patch = operation
+		pathItem.SetPatch(operation)
 	case "DELETE":
-		pathItem.Delete = operation
-	case "OPTIONS":
-		pathItem.Options = operation
-	case "HEAD":
-		pathItem.Head = operation
+		pathItem.SetDelete(operation)
 	}
 
-	spec.Paths[ep.Path] = pathItem
+	openapi.AddPath(ep.Path, pathItem)
 }
 
-func (d *Docs) buildOperation(spec *Spec, ep Endpoint) *Operation {
-	op := &Operation{
-		Summary:     ep.Summary,
-		Description: ep.Description,
-		Tags:        ep.Tags,
-		Deprecated:  ep.Deprecated,
-		Responses:   make(map[string]ResponseSpec),
-	}
+func (d *Docs) buildOperation(ep Endpoint) *spec.Operation {
+	op := spec.NewOperation(ep.Summary).
+		WithDescription(ep.Description).
+		WithTags(ep.Tags...).
+		SetDeprecated(ep.Deprecated)
 
 	// Build parameters
 	for _, param := range ep.Parameters {
-		paramSpec := ParameterSpec{
-			Name:        param.Name,
-			In:          param.In,
-			Description: param.Description,
-			Required:    param.Required,
-			Example:     param.Example,
-		}
+		p := spec.NewParameter(param.Name, param.In).
+			WithDescription(param.Description).
+			SetRequired(param.Required)
+
 		if param.Schema != nil {
-			paramSpec.Schema = param.Schema
+			p.WithSchema(param.Schema)
 		} else {
-			paramSpec.Schema = &Schema{Type: "string"}
+			p.WithSchema(spec.NewSchema("string"))
 		}
-		op.Parameters = append(op.Parameters, paramSpec)
+
+		op.AddParameter(p)
 	}
 
 	// Build request body
@@ -143,52 +183,86 @@ func (d *Docs) buildOperation(spec *Spec, ep Endpoint) *Operation {
 			contentType = "application/json"
 		}
 
-		var schema *Schema
+		var s *spec.Schema
 		if ep.RequestBody.Schema != nil {
-			schema = SchemaFromType(ep.RequestBody.Schema)
+			schemaResult := schema.FromType(ep.RequestBody.Schema)
+			s = convertSchema(schemaResult)
 		}
 
-		op.RequestBody = &RequestBodySpec{
-			Description: ep.RequestBody.Description,
-			Required:    ep.RequestBody.Required,
-			Content: map[string]MediaType{
-				contentType: {Schema: schema},
-			},
-		}
+		rb := spec.NewRequestBody(ep.RequestBody.Description, ep.RequestBody.Required).
+			WithJSONContent(s)
+		op.WithRequestBody(rb)
 	}
 
 	// Build responses
 	for code, resp := range ep.Responses {
-		respSpec := ResponseSpec{
-			Description: resp.Description,
-		}
+		r := spec.NewResponse(resp.Description)
 
 		if resp.Schema != nil {
-			schema := SchemaFromType(resp.Schema)
-			respSpec.Content = map[string]MediaType{
-				"application/json": {Schema: schema},
-			}
+			schemaResult := schema.FromType(resp.Schema)
+			s := convertSchema(schemaResult)
+			r.WithContent("application/json", s)
 		}
 
-		op.Responses[codeToString(code)] = respSpec
+		op.AddResponse(intToString(code), r)
 	}
 
 	// Build security
 	for _, secName := range ep.Security {
-		op.Security = append(op.Security, map[string][]string{
-			secName: {},
-		})
+		op.WithSecurity(spec.SecurityRequirement{secName: {}})
 	}
 
 	return op
 }
 
-func codeToString(code int) string {
-	return fmt.Sprintf("%d", code)
+func convertSchema(s *schema.Schema) *spec.Schema {
+	if s == nil {
+		return nil
+	}
+
+	result := &spec.Schema{
+		Type:        s.Type,
+		Format:      s.Format,
+		Description: s.Description,
+		Example:     s.Example,
+		Default:     s.Default,
+		Enum:        s.Enum,
+		Required:    s.Required,
+		Pattern:     s.Pattern,
+		Minimum:     s.Minimum,
+		Maximum:     s.Maximum,
+		MinLength:   s.MinLength,
+		MaxLength:   s.MaxLength,
+	}
+
+	if s.Items != nil {
+		result.Items = convertSchema(s.Items)
+	}
+
+	if len(s.Properties) > 0 {
+		result.Properties = make(map[string]*spec.Schema)
+		for k, v := range s.Properties {
+			result.Properties[k] = convertSchema(v)
+		}
+	}
+
+	return result
+}
+
+func intToString(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	result := ""
+	for n > 0 {
+		result = string(rune('0'+n%10)) + result
+		n /= 10
+	}
+	return result
 }
 
 // SpecJSON returns the OpenAPI spec as JSON
 func (d *Docs) SpecJSON() ([]byte, error) {
-	spec := d.BuildSpec()
-	return json.MarshalIndent(spec, "", "  ")
+	openapi := d.BuildSpec()
+	return json.MarshalIndent(openapi, "", "  ")
 }

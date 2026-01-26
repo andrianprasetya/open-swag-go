@@ -6,26 +6,27 @@ import (
 	"net/http"
 
 	openswag "github.com/andrianprasetya/open-swag-go"
+	"github.com/andrianprasetya/open-swag-go/pkg/spec"
 )
 
 // DTO types
 type CreateUserRequest struct {
-	Name  string `json:"name" swagger:"required" example:"John Doe" description:"User's full name"`
-	Email string `json:"email" swagger:"required" example:"john@example.com"`
+	Name  string `json:"name" example:"John Doe"`
+	Email string `json:"email" example:"john@example.com"`
 	Age   int    `json:"age" example:"25"`
 }
 
 type UserResponse struct {
-	ID        string `json:"id" format:"uuid"`
+	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
 	Age       int    `json:"age"`
-	CreatedAt string `json:"created_at" format:"date-time"`
+	CreatedAt string `json:"created_at"`
 }
 
 type ErrorResponse struct {
-	Code    int    `json:"code" example:"400"`
-	Message string `json:"message" example:"Bad request"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 // Handlers
@@ -53,18 +54,21 @@ func listUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode([]UserResponse{})
 }
 
-// Swagger docs (co-located style)
+// Endpoint definitions
 var CreateUserDoc = openswag.Endpoint{
 	Method:      "POST",
 	Path:        "/users",
-	Handler:     createUser,
 	Summary:     "Create a new user",
 	Description: "Create a new user account with the provided information",
 	Tags:        []string{"Users"},
-	RequestBody: openswag.Body(CreateUserRequest{}),
-	Responses: openswag.Responses{
-		201: openswag.Response("User created successfully", UserResponse{}),
-		400: openswag.Response("Invalid request", ErrorResponse{}),
+	RequestBody: &openswag.RequestBody{
+		Description: "User data",
+		Required:    true,
+		Schema:      CreateUserRequest{},
+	},
+	Responses: map[int]openswag.Response{
+		201: {Description: "User created successfully", Schema: UserResponse{}},
+		400: {Description: "Invalid request", Schema: ErrorResponse{}},
 	},
 	Security: []string{"bearerAuth"},
 }
@@ -72,16 +76,15 @@ var CreateUserDoc = openswag.Endpoint{
 var GetUserDoc = openswag.Endpoint{
 	Method:      "GET",
 	Path:        "/users/{id}",
-	Handler:     getUser,
 	Summary:     "Get user by ID",
 	Description: "Retrieve a user by their unique identifier",
 	Tags:        []string{"Users"},
 	Parameters: []openswag.Parameter{
-		openswag.PathParam("id", "User ID (UUID format)"),
+		{Name: "id", In: "path", Description: "User ID", Required: true, Schema: spec.NewSchema("string")},
 	},
-	Responses: openswag.Responses{
-		200: openswag.Response("User found", UserResponse{}),
-		404: openswag.Response("User not found", ErrorResponse{}),
+	Responses: map[int]openswag.Response{
+		200: {Description: "User found", Schema: UserResponse{}},
+		404: {Description: "User not found", Schema: ErrorResponse{}},
 	},
 	Security: []string{"bearerAuth"},
 }
@@ -89,16 +92,15 @@ var GetUserDoc = openswag.Endpoint{
 var ListUsersDoc = openswag.Endpoint{
 	Method:      "GET",
 	Path:        "/users",
-	Handler:     listUsers,
 	Summary:     "List all users",
 	Description: "Get a paginated list of users",
 	Tags:        []string{"Users"},
 	Parameters: []openswag.Parameter{
-		openswag.QueryParam("page", "Page number"),
-		openswag.QueryParam("limit", "Items per page"),
+		{Name: "page", In: "query", Description: "Page number"},
+		{Name: "limit", In: "query", Description: "Items per page"},
 	},
-	Responses: openswag.Responses{
-		200: openswag.Response("Users retrieved", []UserResponse{}),
+	Responses: map[int]openswag.Response{
+		200: {Description: "Users retrieved", Schema: []UserResponse{}},
 	},
 	Security: []string{"bearerAuth"},
 }
@@ -126,13 +128,6 @@ func main() {
 			DarkMode:    true,
 			ShowSidebar: true,
 		},
-		Auth: openswag.AuthConfig{
-			PersistCredentials: true,
-			Schemes: []openswag.AuthScheme{
-				openswag.BearerAuth("bearerAuth"),
-				openswag.APIKeyAuth("apiKey", "X-API-Key"),
-			},
-		},
 	})
 
 	// Register endpoints
@@ -147,7 +142,7 @@ func main() {
 	mux.HandleFunc("GET /users", listUsers)
 	mux.HandleFunc("GET /users/{id}", getUser)
 
-	log.Println("🚀 Server running on http://localhost:8080")
-	log.Println("📚 Docs available at http://localhost:8080/docs/")
+	log.Println("Server running on http://localhost:8080")
+	log.Println("Docs available at http://localhost:8080/docs/")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }

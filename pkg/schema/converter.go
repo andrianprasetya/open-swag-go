@@ -1,4 +1,4 @@
-package openswag
+package schema
 
 import (
 	"reflect"
@@ -24,19 +24,19 @@ type Schema struct {
 	Ref         string             `json:"$ref,omitempty"`
 }
 
-// SchemaFromType converts a Go type to JSON Schema
-func SchemaFromType(t interface{}) *Schema {
-	return schemaFromReflectType(reflect.TypeOf(t))
+// FromType converts a Go type to JSON Schema
+func FromType(t interface{}) *Schema {
+	return fromReflectType(reflect.TypeOf(t))
 }
 
-func schemaFromReflectType(t reflect.Type) *Schema {
+func fromReflectType(t reflect.Type) *Schema {
 	if t == nil {
 		return &Schema{Type: "object"}
 	}
 
 	// Handle pointer types
 	if t.Kind() == reflect.Ptr {
-		return schemaFromReflectType(t.Elem())
+		return fromReflectType(t.Elem())
 	}
 
 	switch t.Kind() {
@@ -53,10 +53,10 @@ func schemaFromReflectType(t reflect.Type) *Schema {
 	case reflect.Slice, reflect.Array:
 		return &Schema{
 			Type:  "array",
-			Items: schemaFromReflectType(t.Elem()),
+			Items: fromReflectType(t.Elem()),
 		}
 	case reflect.Struct:
-		return schemaFromStruct(t)
+		return fromStruct(t)
 	case reflect.Map:
 		return &Schema{Type: "object"}
 	default:
@@ -64,7 +64,7 @@ func schemaFromReflectType(t reflect.Type) *Schema {
 	}
 }
 
-func schemaFromStruct(t reflect.Type) *Schema {
+func fromStruct(t reflect.Type) *Schema {
 	schema := &Schema{
 		Type:       "object",
 		Properties: make(map[string]*Schema),
@@ -74,12 +74,10 @@ func schemaFromStruct(t reflect.Type) *Schema {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 
-		// Skip unexported fields
 		if !field.IsExported() {
 			continue
 		}
 
-		// Get JSON tag
 		jsonTag := field.Tag.Get("json")
 		if jsonTag == "-" {
 			continue
@@ -90,81 +88,15 @@ func schemaFromStruct(t reflect.Type) *Schema {
 			name = field.Name
 		}
 
-		// Parse field schema
-		fieldSchema := schemaFromReflectType(field.Type)
-		parseFieldTags(field, fieldSchema)
+		fieldSchema := fromReflectType(field.Type)
+		ParseFieldTags(field, fieldSchema)
 
 		schema.Properties[name] = fieldSchema
 
-		// Check if required
-		if isFieldRequired(field) {
+		if IsRequired(field) {
 			schema.Required = append(schema.Required, name)
 		}
 	}
 
 	return schema
-}
-
-func parseFieldTags(field reflect.StructField, schema *Schema) {
-	// Parse example tag
-	if example := field.Tag.Get("example"); example != "" {
-		schema.Example = example
-	}
-
-	// Parse description tag
-	if desc := field.Tag.Get("description"); desc != "" {
-		schema.Description = desc
-	}
-
-	// Parse format tag
-	if format := field.Tag.Get("format"); format != "" {
-		schema.Format = format
-	}
-
-	// Parse swagger tag
-	if swagger := field.Tag.Get("swagger"); swagger != "" {
-		parseSwaggerTag(swagger, schema)
-	}
-}
-
-func parseSwaggerTag(tag string, schema *Schema) {
-	parts := strings.Split(tag, ",")
-	for _, part := range parts {
-		kv := strings.SplitN(part, "=", 2)
-		key := strings.TrimSpace(kv[0])
-
-		switch key {
-		case "format":
-			if len(kv) > 1 {
-				schema.Format = kv[1]
-			}
-		case "description":
-			if len(kv) > 1 {
-				schema.Description = kv[1]
-			}
-		case "example":
-			if len(kv) > 1 {
-				schema.Example = kv[1]
-			}
-		}
-	}
-}
-
-func isFieldRequired(field reflect.StructField) bool {
-	// Check swagger tag
-	if swagger := field.Tag.Get("swagger"); strings.Contains(swagger, "required") {
-		return true
-	}
-
-	// Check validate tag (for validator libraries)
-	if validate := field.Tag.Get("validate"); strings.Contains(validate, "required") {
-		return true
-	}
-
-	// Check binding tag (for Gin)
-	if binding := field.Tag.Get("binding"); strings.Contains(binding, "required") {
-		return true
-	}
-
-	return false
 }

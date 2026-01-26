@@ -304,11 +304,131 @@ if diff.HasBreakingChanges() {
 }
 ```
 
+## Generate TypeScript Types for Frontend
+
+The OpenAPI spec is available at `/docs/openapi.json` when your server is running. You can use this to generate TypeScript types for your frontend (Nuxt, Next.js, React, Vue, etc.).
+
+### Option 1: openapi-typescript (Types only)
+
+```bash
+# Install
+npm install -D openapi-typescript
+# or
+bun add -D openapi-typescript
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "generate:api-schema": "openapi-typescript http://localhost:8080/docs/openapi.json -o ./types/api.d.ts"
+  }
+}
+```
+
+```bash
+# Run (make sure Go server is running)
+bun run generate:api-schema
+```
+
+### Option 2: openapi-fetch (Types + Fetch Client)
+
+```bash
+npm install openapi-fetch
+npm install -D openapi-typescript
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "generate:api-schema": "openapi-typescript http://localhost:8080/docs/openapi.json -o ./types/api.d.ts"
+  }
+}
+```
+
+Usage in your frontend:
+```typescript
+// composables/useApi.ts
+import createClient from 'openapi-fetch'
+import type { paths } from '~/types/api'
+
+export const api = createClient<paths>({ baseUrl: 'http://localhost:8080' })
+
+// Fully typed API calls!
+const { data } = await api.GET('/users/{id}', {
+  params: { path: { id: '123' } }
+})
+```
+
+### Option 3: orval (Full Client with Vue Query/React Query)
+
+```bash
+npm install -D orval
+```
+
+```typescript
+// orval.config.ts
+export default {
+  api: {
+    input: 'http://localhost:8080/docs/openapi.json',
+    output: {
+      target: './api/generated.ts',
+      client: 'vue-query', // or 'react-query', 'fetch'
+    },
+  },
+}
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "generate:api-schema": "orval"
+  }
+}
+```
+
+### Export Spec to File (Optional)
+
+If you want to generate the spec without running the server:
+
+```go
+// cmd/generate-spec/main.go
+package main
+
+import (
+    "os"
+    "myapp/internal/docs"
+)
+
+func main() {
+    swagger := docs.Setup()
+    specJSON, _ := swagger.SpecJSON()
+    os.WriteFile("openapi.json", specJSON, 0644)
+}
+```
+
+```bash
+go run cmd/generate-spec/main.go
+```
+
+Then point your frontend tool to the local file:
+```json
+{
+  "scripts": {
+    "generate:api-schema": "openapi-typescript ./openapi.json -o ./types/api.d.ts"
+  }
+}
+```
+
 ## Examples
 
 See the [examples](./examples) directory:
 - [Basic](./examples/basic) - Simple usage
+- [With Auth](./examples/with-auth) - Authentication examples
 - [Full Featured](./examples/full-featured) - Complete API with all features
+- [Version Diff](./examples/version-diff) - Breaking change detection
 
 ## License
 

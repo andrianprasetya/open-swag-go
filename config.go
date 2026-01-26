@@ -2,12 +2,21 @@ package openswag
 
 // Config is the main configuration for the documentation
 type Config struct {
-	Info    Info        `json:"info"`
-	Servers []Server    `json:"servers,omitempty"`
-	Tags    []Tag       `json:"tags,omitempty"`
-	UI      UIConfig    `json:"ui"`
-	Auth    AuthConfig  `json:"auth,omitempty"`
-	TryIt   TryItConfig `json:"tryIt,omitempty"`
+	Info     Info      `json:"info"`
+	Servers  []Server  `json:"servers,omitempty"`
+	Tags     []Tag     `json:"tags,omitempty"`
+	UI       UIConfig  `json:"ui"`
+	DocsAuth *DocsAuth `json:"docsAuth,omitempty"`
+}
+
+// DocsAuth configures basic auth protection for the docs UI
+type DocsAuth struct {
+	Enabled  bool   `json:"enabled"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Realm    string `json:"realm,omitempty"`
+	// Alternative: use API key in query param (?key=xxx)
+	APIKey string `json:"apiKey,omitempty"`
 }
 
 // Info represents OpenAPI info object

@@ -372,7 +372,7 @@ func (d *Docs) Handler() http.Handler {
 ## Project Structure
 
 ```
-go-openapi-ui/
+open-swag-go/
 ├── go.mod
 ├── go.sum
 ├── README.md
