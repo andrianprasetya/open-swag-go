@@ -2,6 +2,7 @@ package echo
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -10,8 +11,11 @@ import (
 
 // Mount mounts the documentation on an Echo router
 func Mount(e *echo.Echo, docs *openswag.Docs, basePath string) {
+	if !strings.HasSuffix(basePath, "/") {
+		basePath += "/"
+	}
 	e.GET(basePath, echo.WrapHandler(http.HandlerFunc(docs.Handler())))
-	e.GET(basePath+"/openapi.json", echo.WrapHandler(http.HandlerFunc(docs.SpecHandler())))
+	e.GET(basePath+"openapi.json", echo.WrapHandler(http.HandlerFunc(docs.SpecHandler())))
 }
 
 // MountGroup mounts the documentation on an Echo group

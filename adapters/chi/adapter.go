@@ -1,6 +1,8 @@
 package chi
 
 import (
+	"strings"
+
 	"github.com/go-chi/chi/v5"
 
 	openswag "github.com/andrianprasetya/open-swag-go"
@@ -8,6 +10,9 @@ import (
 
 // Mount mounts the documentation on a Chi router
 func Mount(r chi.Router, docs *openswag.Docs, basePath string) {
+	if !strings.HasSuffix(basePath, "/") {
+		basePath += "/"
+	}
 	r.Get(basePath, docs.Handler())
-	r.Get(basePath+"/openapi.json", docs.SpecHandler())
+	r.Get(basePath+"openapi.json", docs.SpecHandler())
 }

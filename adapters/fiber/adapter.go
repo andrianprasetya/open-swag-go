@@ -1,6 +1,8 @@
 package fiber
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 
@@ -9,8 +11,11 @@ import (
 
 // Mount mounts the documentation on a Fiber app
 func Mount(app *fiber.App, docs *openswag.Docs, basePath string) {
+	if !strings.HasSuffix(basePath, "/") {
+		basePath += "/"
+	}
 	app.Get(basePath, adaptor.HTTPHandlerFunc(docs.Handler()))
-	app.Get(basePath+"/openapi.json", adaptor.HTTPHandlerFunc(docs.SpecHandler()))
+	app.Get(basePath+"openapi.json", adaptor.HTTPHandlerFunc(docs.SpecHandler()))
 }
 
 // MountGroup mounts the documentation on a Fiber router group
