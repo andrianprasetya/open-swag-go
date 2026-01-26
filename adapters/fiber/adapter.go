@@ -11,11 +11,19 @@ import (
 
 // Mount mounts the documentation on a Fiber app
 func Mount(app *fiber.App, docs *openswag.Docs, basePath string) {
-	if !strings.HasSuffix(basePath, "/") {
-		basePath += "/"
+	// Ensure basePath ends with /
+	baseWithSlash := basePath
+	if !strings.HasSuffix(baseWithSlash, "/") {
+		baseWithSlash += "/"
 	}
-	app.Get(basePath, adaptor.HTTPHandlerFunc(docs.Handler()))
-	app.Get(basePath+"openapi.json", adaptor.HTTPHandlerFunc(docs.SpecHandler()))
+	baseWithoutSlash := strings.TrimSuffix(baseWithSlash, "/")
+
+	// Redirect /docs to /docs/ to fix relative URL resolution
+	app.Get(baseWithoutSlash, func(c *fiber.Ctx) error {
+		return c.Redirect(baseWithSlash, 301)
+	})
+	app.Get(baseWithSlash, adaptor.HTTPHandlerFunc(docs.Handler()))
+	app.Get(baseWithSlash+"openapi.json", adaptor.HTTPHandlerFunc(docs.SpecHandler()))
 }
 
 // MountGroup mounts the documentation on a Fiber router group
