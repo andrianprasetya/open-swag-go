@@ -112,4 +112,38 @@ func TestFromType_JSON(t *testing.T) {
 	if grantType["type"] != "string" {
 		t.Errorf("grant_type.type should be 'string', got %v", grantType["type"])
 	}
+
+	if grantType["example"] != "string" {
+		t.Errorf("grant_type.example should be 'string', got %v", grantType["example"])
+	}
+}
+
+func TestFromType_Examples(t *testing.T) {
+	type TestStruct struct {
+		Name   string  `json:"name"`
+		Age    int     `json:"age"`
+		Score  float64 `json:"score"`
+		Active bool    `json:"active"`
+		Custom string  `json:"custom" example:"my-custom-value"`
+	}
+
+	schema := FromType(TestStruct{})
+
+	// Check default examples
+	if schema.Properties["name"].Example != "string" {
+		t.Errorf("name.example should be 'string', got %v", schema.Properties["name"].Example)
+	}
+	if schema.Properties["age"].Example != 0 {
+		t.Errorf("age.example should be 0, got %v", schema.Properties["age"].Example)
+	}
+	if schema.Properties["score"].Example != 0.0 {
+		t.Errorf("score.example should be 0.0, got %v", schema.Properties["score"].Example)
+	}
+	if schema.Properties["active"].Example != false {
+		t.Errorf("active.example should be false, got %v", schema.Properties["active"].Example)
+	}
+	// Check custom example from tag
+	if schema.Properties["custom"].Example != "my-custom-value" {
+		t.Errorf("custom.example should be 'my-custom-value', got %v", schema.Properties["custom"].Example)
+	}
 }

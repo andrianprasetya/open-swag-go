@@ -50,32 +50,32 @@ func fromReflectType(t reflect.Type) *Schema {
 
 	// Handle time.Time specially
 	if t == reflect.TypeOf(time.Time{}) {
-		return &Schema{Type: "string", Format: "date-time"}
+		return &Schema{Type: "string", Format: "date-time", Example: "2024-01-01T00:00:00Z"}
 	}
 
 	switch t.Kind() {
 	case reflect.String:
-		return &Schema{Type: "string"}
+		return &Schema{Type: "string", Example: "string"}
 	case reflect.Int:
-		return &Schema{Type: "integer"}
+		return &Schema{Type: "integer", Example: 0}
 	case reflect.Int8, reflect.Int16:
-		return &Schema{Type: "integer"}
+		return &Schema{Type: "integer", Example: 0}
 	case reflect.Int32:
-		return &Schema{Type: "integer", Format: "int32"}
+		return &Schema{Type: "integer", Format: "int32", Example: 0}
 	case reflect.Int64:
-		return &Schema{Type: "integer", Format: "int64"}
+		return &Schema{Type: "integer", Format: "int64", Example: 0}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16:
-		return &Schema{Type: "integer"}
+		return &Schema{Type: "integer", Example: 0}
 	case reflect.Uint32:
-		return &Schema{Type: "integer", Format: "int32"}
+		return &Schema{Type: "integer", Format: "int32", Example: 0}
 	case reflect.Uint64:
-		return &Schema{Type: "integer", Format: "int64"}
+		return &Schema{Type: "integer", Format: "int64", Example: 0}
 	case reflect.Float32:
-		return &Schema{Type: "number", Format: "float"}
+		return &Schema{Type: "number", Format: "float", Example: 0.0}
 	case reflect.Float64:
-		return &Schema{Type: "number", Format: "double"}
+		return &Schema{Type: "number", Format: "double", Example: 0.0}
 	case reflect.Bool:
-		return &Schema{Type: "boolean"}
+		return &Schema{Type: "boolean", Example: false}
 	case reflect.Slice, reflect.Array:
 		return &Schema{
 			Type:  "array",
@@ -86,12 +86,11 @@ func fromReflectType(t reflect.Type) *Schema {
 	case reflect.Map:
 		return &Schema{
 			Type: "object",
-			// AdditionalProperties could be set here if needed
 		}
 	case reflect.Interface:
 		return &Schema{Type: "object"}
 	default:
-		return &Schema{Type: "string"}
+		return &Schema{Type: "string", Example: "string"}
 	}
 }
 
