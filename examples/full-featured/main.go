@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	openswag "github.com/andrianprasetya/open-swag-go"
-	"github.com/andrianprasetya/open-swag-go/pkg/spec"
 )
 
 // DTOs
@@ -77,7 +76,7 @@ func deleteProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Endpoint definitions
+// Endpoint definitions - use predefined security constants
 var CreateProductDoc = openswag.Endpoint{
 	Method:      "POST",
 	Path:        "/products",
@@ -95,7 +94,7 @@ var CreateProductDoc = openswag.Endpoint{
 		401: {Description: "Unauthorized", Schema: ErrorResponse{}},
 		500: {Description: "Server error", Schema: ErrorResponse{}},
 	},
-	Security: []string{"bearerAuth"},
+	Security: []string{openswag.SecurityBearerAuth}, // Use predefined constant
 }
 
 var GetProductDoc = openswag.Endpoint{
@@ -140,7 +139,7 @@ var UpdateProductDoc = openswag.Endpoint{
 		400: {Description: "Invalid request", Schema: ErrorResponse{}},
 		404: {Description: "Product not found", Schema: ErrorResponse{}},
 	},
-	Security: []string{"bearerAuth"},
+	Security: []string{openswag.SecurityBearerAuth},
 }
 
 var DeleteProductDoc = openswag.Endpoint{
@@ -154,7 +153,7 @@ var DeleteProductDoc = openswag.Endpoint{
 		204: {Description: "Product deleted"},
 		404: {Description: "Product not found", Schema: ErrorResponse{}},
 	},
-	Security:   []string{"bearerAuth"},
+	Security:   []string{openswag.SecurityBearerAuth},
 	Deprecated: false,
 }
 
@@ -190,23 +189,13 @@ func main() {
 			ShowSidebar: true,
 			Layout:      "modern",
 		},
-		// Basic auth protection for docs (optional)
+		// Protect docs UI (optional)
 		DocsAuth: &openswag.DocsAuth{
 			Enabled: true,
 			APIKey:  "my-secret-key", // Access via ?key=my-secret-key
-			// Or use basic auth:
-			// Username: "admin",
-			// Password: "secret",
 		},
-	})
-
-	// Add security scheme
-	openapi := docs.BuildSpec()
-	openapi.AddSecurityScheme("bearerAuth", &spec.SecurityScheme{
-		Type:         "http",
-		Scheme:       "bearer",
-		BearerFormat: "JWT",
-		Description:  "JWT authentication",
+		// Security schemes are auto-generated based on endpoint usage!
+		// Just use: Security: []string{openswag.SecurityBearerAuth}
 	})
 
 	docs.AddAll(

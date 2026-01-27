@@ -9,6 +9,15 @@ type Config struct {
 	DocsAuth *DocsAuth `json:"docsAuth,omitempty"`
 }
 
+// Predefined security scheme names for use in Endpoint.Security
+const (
+	SecurityBearerAuth  = "bearerAuth"  // JWT Bearer token
+	SecurityBasicAuth   = "basicAuth"   // HTTP Basic auth
+	SecurityApiKey      = "apiKeyAuth"  // API Key in header (X-API-Key)
+	SecurityApiKeyQuery = "apiKeyQuery" // API Key in query param (?api_key=)
+	SecurityOAuth2      = "oauth2"      // OAuth2
+)
+
 // DocsAuth configures basic auth protection for the docs UI
 type DocsAuth struct {
 	Enabled  bool   `json:"enabled"`

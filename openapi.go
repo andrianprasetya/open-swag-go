@@ -129,8 +129,88 @@ func (d *Docs) BuildSpec() *spec.OpenAPI {
 		d.addEndpointToSpec(openapi, ep)
 	}
 
+	// Add predefined security schemes if any endpoint uses security
+	d.addSecuritySchemes(openapi)
+
 	d.openapi = openapi
 	return openapi
+}
+
+// addSecuritySchemes adds predefined security schemes based on endpoint usage
+func (d *Docs) addSecuritySchemes(openapi *spec.OpenAPI) {
+	usedSchemes := make(map[string]bool)
+
+	// Collect all used security schemes from endpoints
+	for _, ep := range d.endpoints {
+		for _, sec := range ep.Security {
+			usedSchemes[sec] = true
+		}
+	}
+
+	if len(usedSchemes) == 0 {
+		return
+	}
+
+	if openapi.Components == nil {
+		openapi.Components = &spec.Components{}
+	}
+	openapi.Components.SecuritySchemes = make(map[string]*spec.SecurityScheme)
+
+	// Add only the schemes that are actually used
+	for scheme := range usedSchemes {
+		switch scheme {
+		case SecurityBearerAuth:
+			openapi.Components.SecuritySchemes[SecurityBearerAuth] = &spec.SecurityScheme{
+				Type:         "http",
+				Scheme:       "bearer",
+				BearerFormat: "JWT",
+				Description:  "JWT Bearer token authentication",
+			}
+		case SecurityBasicAuth:
+			openapi.Components.SecuritySchemes[SecurityBasicAuth] = &spec.SecurityScheme{
+				Type:        "http",
+				Scheme:      "basic",
+				Description: "HTTP Basic authentication",
+			}
+		case SecurityApiKey:
+			openapi.Components.SecuritySchemes[SecurityApiKey] = &spec.SecurityScheme{
+				Type:        "apiKey",
+				In:          "header",
+				Name:        "X-API-Key",
+				Description: "API key in X-API-Key header",
+			}
+		case SecurityApiKeyQuery:
+			openapi.Components.SecuritySchemes[SecurityApiKeyQuery] = &spec.SecurityScheme{
+				Type:        "apiKey",
+				In:          "query",
+				Name:        "api_key",
+				Description: "API key in query parameter",
+			}
+		case SecurityOAuth2:
+			openapi.Components.SecuritySchemes[SecurityOAuth2] = &spec.SecurityScheme{
+				Type:        "oauth2",
+				Description: "OAuth2 authentication",
+				Flows: &spec.OAuthFlows{
+					AuthorizationCode: &spec.OAuthFlow{
+						AuthorizationURL: "/oauth2/authorize",
+						TokenURL:         "/oauth2/token",
+						Scopes: map[string]string{
+							"read":  "Read access",
+							"write": "Write access",
+						},
+					},
+				},
+			}
+		default:
+			// Custom scheme name - add as bearer auth by default
+			openapi.Components.SecuritySchemes[scheme] = &spec.SecurityScheme{
+				Type:         "http",
+				Scheme:       "bearer",
+				BearerFormat: "JWT",
+				Description:  scheme + " authentication",
+			}
+		}
+	}
 }
 
 func (d *Docs) addEndpointToSpec(openapi *spec.OpenAPI, ep Endpoint) {
