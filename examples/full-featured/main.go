@@ -39,6 +39,18 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// Query/Path parameter structs (NEW FEATURE)
+type ListProductsQuery struct {
+	Page     int    `form:"page" description:"Page number" example:"1"`
+	PerPage  int    `form:"per_page" description:"Items per page" example:"20"`
+	Category string `form:"category" description:"Filter by category ID"`
+	Search   string `form:"search" description:"Search term"`
+}
+
+type ProductPathParams struct {
+	ID string `param:"id" description:"Product ID" example:"prod_123"`
+}
+
 // Handlers
 func createProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -92,9 +104,7 @@ var GetProductDoc = openswag.Endpoint{
 	Summary:     "Get product by ID",
 	Description: "Retrieve a single product by its ID",
 	Tags:        []string{"Products"},
-	Parameters: []openswag.Parameter{
-		{Name: "id", In: "path", Description: "Product ID", Required: true, Schema: spec.NewSchema("string")},
-	},
+	PathParams:  ProductPathParams{}, // Using struct instead of manual Parameters
 	Responses: map[int]openswag.Response{
 		200: {Description: "Product found", Schema: ProductResponse{}},
 		404: {Description: "Product not found", Schema: ErrorResponse{}},
@@ -107,12 +117,7 @@ var ListProductsDoc = openswag.Endpoint{
 	Summary:     "List products",
 	Description: "Get a paginated list of products with optional filtering",
 	Tags:        []string{"Products"},
-	Parameters: []openswag.Parameter{
-		{Name: "page", In: "query", Description: "Page number"},
-		{Name: "per_page", In: "query", Description: "Items per page"},
-		{Name: "category", In: "query", Description: "Filter by category ID"},
-		{Name: "search", In: "query", Description: "Search term"},
-	},
+	QueryParams: ListProductsQuery{}, // Using struct instead of manual Parameters
 	Responses: map[int]openswag.Response{
 		200: {Description: "Products list", Schema: PaginatedProducts{}},
 	},
@@ -124,9 +129,7 @@ var UpdateProductDoc = openswag.Endpoint{
 	Summary:     "Update product",
 	Description: "Update an existing product",
 	Tags:        []string{"Products"},
-	Parameters: []openswag.Parameter{
-		{Name: "id", In: "path", Description: "Product ID", Required: true, Schema: spec.NewSchema("string")},
-	},
+	PathParams:  ProductPathParams{},
 	RequestBody: &openswag.RequestBody{
 		Description: "Updated product data",
 		Required:    true,
@@ -146,9 +149,7 @@ var DeleteProductDoc = openswag.Endpoint{
 	Summary:     "Delete product",
 	Description: "Delete a product from the catalog",
 	Tags:        []string{"Products"},
-	Parameters: []openswag.Parameter{
-		{Name: "id", In: "path", Description: "Product ID", Required: true, Schema: spec.NewSchema("string")},
-	},
+	PathParams:  ProductPathParams{},
 	Responses: map[int]openswag.Response{
 		204: {Description: "Product deleted"},
 		404: {Description: "Product not found", Schema: ErrorResponse{}},

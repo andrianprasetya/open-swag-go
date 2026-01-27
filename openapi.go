@@ -2,6 +2,7 @@ package openswag
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -25,6 +26,8 @@ type Endpoint struct {
 	Description string
 	Tags        []string
 	Parameters  []Parameter
+	QueryParams interface{} // Struct with query parameters (uses form/query tags)
+	PathParams  interface{} // Struct with path parameters
 	RequestBody *RequestBody
 	Responses   map[int]Response
 	Security    []string
@@ -161,7 +164,7 @@ func (d *Docs) buildOperation(ep Endpoint) *spec.Operation {
 		WithTags(ep.Tags...).
 		SetDeprecated(ep.Deprecated)
 
-	// Build parameters
+	// Build explicit parameters
 	for _, param := range ep.Parameters {
 		p := spec.NewParameter(param.Name, param.In).
 			WithDescription(param.Description).
@@ -174,6 +177,35 @@ func (d *Docs) buildOperation(ep Endpoint) *spec.Operation {
 		}
 
 		op.AddParameter(p)
+	}
+
+	// Build query parameters from struct
+	if ep.QueryParams != nil {
+		params := d.buildParamsFromStruct(ep.QueryParams, "query")
+		for _, p := range params {
+			op.AddParameter(p)
+		}
+	}
+
+	// Build path parameters from struct
+	if ep.PathParams != nil {
+		params := d.buildParamsFromStruct(ep.PathParams, "path")
+		for _, p := range params {
+			p.SetRequired(true) // Path params are always required
+			op.AddParameter(p)
+		}
+	}
+
+	// Auto-extract path params from path like /users/:id or /users/{id}
+	pathParams := extractPathParams(ep.Path)
+	for _, paramName := range pathParams {
+		// Skip if already defined
+		if !hasParam(op.Parameters, paramName) {
+			p := spec.NewParameter(paramName, "path").
+				SetRequired(true).
+				WithSchema(spec.NewSchema("string"))
+			op.AddParameter(p)
+		}
 	}
 
 	// Build request body
@@ -213,6 +245,107 @@ func (d *Docs) buildOperation(ep Endpoint) *spec.Operation {
 	}
 
 	return op
+}
+
+// buildParamsFromStruct extracts parameters from a struct using reflection
+func (d *Docs) buildParamsFromStruct(v interface{}, location string) []*spec.Parameter {
+	var params []*spec.Parameter
+
+	t := reflect.TypeOf(v)
+	if t == nil {
+		return params
+	}
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	if t.Kind() != reflect.Struct {
+		return params
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+
+		if !field.IsExported() {
+			continue
+		}
+
+		// Get parameter name from tags (form, query, param, json)
+		name := field.Tag.Get("form")
+		if name == "" {
+			name = field.Tag.Get("query")
+		}
+		if name == "" {
+			name = field.Tag.Get("param")
+		}
+		if name == "" {
+			name = field.Tag.Get("json")
+		}
+		if name == "" {
+			name = strings.ToLower(field.Name)
+		}
+		name = strings.Split(name, ",")[0]
+
+		if name == "-" {
+			continue
+		}
+
+		// Build schema from field type
+		fieldSchema := schema.FromType(reflect.New(field.Type).Elem().Interface())
+		specSchema := convertSchema(fieldSchema)
+
+		// Get description and example from tags
+		description := field.Tag.Get("description")
+		if description == "" {
+			description = field.Tag.Get("doc")
+		}
+
+		p := spec.NewParameter(name, location).
+			WithDescription(description).
+			WithSchema(specSchema)
+
+		// Check if required
+		validate := field.Tag.Get("validate")
+		if strings.Contains(validate, "required") {
+			p.SetRequired(true)
+		}
+
+		// Check for example tag
+		if example := field.Tag.Get("example"); example != "" {
+			p.WithExample(example)
+		}
+
+		params = append(params, p)
+	}
+
+	return params
+}
+
+// extractPathParams extracts parameter names from path like /users/:id or /users/{id}
+func extractPathParams(path string) []string {
+	var params []string
+	parts := strings.Split(path, "/")
+
+	for _, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			params = append(params, strings.TrimPrefix(part, ":"))
+		} else if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			params = append(params, strings.Trim(part, "{}"))
+		}
+	}
+
+	return params
+}
+
+// hasParam checks if a parameter with the given name already exists
+func hasParam(params []*spec.Parameter, name string) bool {
+	for _, p := range params {
+		if p.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func convertSchema(s *schema.Schema) *spec.Schema {

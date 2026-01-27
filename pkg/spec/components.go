@@ -224,6 +224,12 @@ func (p *Parameter) SetRequired(required bool) *Parameter {
 	return p
 }
 
+// WithExample sets the parameter example
+func (p *Parameter) WithExample(example any) *Parameter {
+	p.Example = example
+	return p
+}
+
 // NewRequestBody creates a new request body
 func NewRequestBody(description string, required bool) *RequestBody {
 	return &RequestBody{
