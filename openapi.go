@@ -271,13 +271,16 @@ func (d *Docs) buildParamsFromStruct(v interface{}, location string) []*spec.Par
 			continue
 		}
 
-		// Get parameter name from tags (form, query, param, json)
+		// Get parameter name from tags (form, query, param, path, json)
 		name := field.Tag.Get("form")
 		if name == "" {
 			name = field.Tag.Get("query")
 		}
 		if name == "" {
 			name = field.Tag.Get("param")
+		}
+		if name == "" {
+			name = field.Tag.Get("path")
 		}
 		if name == "" {
 			name = field.Tag.Get("json")
@@ -291,8 +294,8 @@ func (d *Docs) buildParamsFromStruct(v interface{}, location string) []*spec.Par
 			continue
 		}
 
-		// Build schema from field type
-		fieldSchema := schema.FromType(reflect.New(field.Type).Elem().Interface())
+		// Build schema from field type using reflect.Type directly
+		fieldSchema := schema.FromReflectType(field.Type)
 		specSchema := convertSchema(fieldSchema)
 
 		// Get description and example from tags
@@ -307,7 +310,8 @@ func (d *Docs) buildParamsFromStruct(v interface{}, location string) []*spec.Par
 
 		// Check if required
 		validate := field.Tag.Get("validate")
-		if strings.Contains(validate, "required") {
+		binding := field.Tag.Get("binding")
+		if strings.Contains(validate, "required") || strings.Contains(binding, "required") {
 			p.SetRequired(true)
 		}
 

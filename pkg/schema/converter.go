@@ -3,6 +3,7 @@ package schema
 import (
 	"reflect"
 	"strings"
+	"time"
 )
 
 // Schema represents a JSON Schema
@@ -26,7 +27,15 @@ type Schema struct {
 
 // FromType converts a Go type to JSON Schema
 func FromType(t interface{}) *Schema {
+	if t == nil {
+		return &Schema{Type: "object"}
+	}
 	return fromReflectType(reflect.TypeOf(t))
+}
+
+// FromReflectType converts a reflect.Type to JSON Schema
+func FromReflectType(t reflect.Type) *Schema {
+	return fromReflectType(t)
 }
 
 func fromReflectType(t reflect.Type) *Schema {
@@ -39,15 +48,32 @@ func fromReflectType(t reflect.Type) *Schema {
 		return fromReflectType(t.Elem())
 	}
 
+	// Handle time.Time specially
+	if t == reflect.TypeOf(time.Time{}) {
+		return &Schema{Type: "string", Format: "date-time"}
+	}
+
 	switch t.Kind() {
 	case reflect.String:
 		return &Schema{Type: "string"}
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+	case reflect.Int:
 		return &Schema{Type: "integer"}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case reflect.Int8, reflect.Int16:
 		return &Schema{Type: "integer"}
-	case reflect.Float32, reflect.Float64:
-		return &Schema{Type: "number"}
+	case reflect.Int32:
+		return &Schema{Type: "integer", Format: "int32"}
+	case reflect.Int64:
+		return &Schema{Type: "integer", Format: "int64"}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16:
+		return &Schema{Type: "integer"}
+	case reflect.Uint32:
+		return &Schema{Type: "integer", Format: "int32"}
+	case reflect.Uint64:
+		return &Schema{Type: "integer", Format: "int64"}
+	case reflect.Float32:
+		return &Schema{Type: "number", Format: "float"}
+	case reflect.Float64:
+		return &Schema{Type: "number", Format: "double"}
 	case reflect.Bool:
 		return &Schema{Type: "boolean"}
 	case reflect.Slice, reflect.Array:
@@ -58,9 +84,14 @@ func fromReflectType(t reflect.Type) *Schema {
 	case reflect.Struct:
 		return fromStruct(t)
 	case reflect.Map:
+		return &Schema{
+			Type: "object",
+			// AdditionalProperties could be set here if needed
+		}
+	case reflect.Interface:
 		return &Schema{Type: "object"}
 	default:
-		return &Schema{Type: "object"}
+		return &Schema{Type: "string"}
 	}
 }
 
@@ -78,6 +109,7 @@ func fromStruct(t reflect.Type) *Schema {
 			continue
 		}
 
+		// Get field name from json tag first, then form tag
 		jsonTag := field.Tag.Get("json")
 		if jsonTag == "-" {
 			continue
@@ -85,17 +117,33 @@ func fromStruct(t reflect.Type) *Schema {
 
 		name := strings.Split(jsonTag, ",")[0]
 		if name == "" {
+			// Fallback to form tag
+			formTag := field.Tag.Get("form")
+			if formTag != "" && formTag != "-" {
+				name = strings.Split(formTag, ",")[0]
+			}
+		}
+		if name == "" {
 			name = field.Name
 		}
 
+		// Build schema from field type
 		fieldSchema := fromReflectType(field.Type)
+
+		// Parse additional tags
 		ParseFieldTags(field, fieldSchema)
 
 		schema.Properties[name] = fieldSchema
 
+		// Check if required
 		if IsRequired(field) {
 			schema.Required = append(schema.Required, name)
 		}
+	}
+
+	// Remove empty required array
+	if len(schema.Required) == 0 {
+		schema.Required = nil
 	}
 
 	return schema
