@@ -11,6 +11,16 @@ require (
 	github.com/labstack/echo/v4 v4.15.0
 )
 
+retract (
+    v1.3.0  // Contains errors
+    v1.2.1  // Contains errors
+    v1.2.0  // Contains errors
+    v1.1.0  // Contains errors
+    v1.0.2  // Contains errors
+    v1.0.1  // Contains errors
+    v1.0.0  // Contains errors
+)
+
 require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
